@@ -1,4 +1,5 @@
 import stripe
+from app.services.cache_service import get_cache, set_cache, delete_cache
 from fastapi import HTTPException, Request
 from sqlalchemy.orm import Session
 from app.config import settings
@@ -11,25 +12,30 @@ def get_stripe_client():
     stripe.api_key = settings.STRIPE_SECRET_KEY
     return stripe
 
-def create_or_get_customer(user, db: Session):
-    stripe_client = get_stripe_client()
+async def create_or_get_customer(user, db: Session):
+        stripe_client = get_stripe_client()
 
-    if user.stripe_customer_id:
-        return user.stripe_customer_id
-    
-    if not user.email:
-        raise HTTPException(status_code=400, detail="User does not have an email address")
-    
-    customer = stripe_client.Customer.create(
-        email=user.email,
-        metadata={"user_id": str(user.id)})
-    
-    user.stripe_customer_id = customer["id"]
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    
-    return customer["id"]
+        cached_customer_id = await get_cache(f"stripe_customer:{user.id}")
+        if cached_customer_id:
+            return cached_customer_id
+
+        if user.stripe_customer_id:
+            return user.stripe_customer_id
+        
+        if not user.email:
+            raise HTTPException(status_code=400, detail="User does not have an email address")
+        
+        customer = stripe_client.Customer.create(
+            email=user.email,
+            metadata={"user_id": str(user.id)})
+        
+        user.stripe_customer_id = customer["id"]
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        await set_cache(f"stripe_customer:{user.id}", customer["id"], expire=3600)
+        return customer["id"]
 
 def create_checkout_session(user, db: Session):
 
@@ -70,32 +76,34 @@ async def verify_and_construct_event(request):
     except ValueError:
         raise HTTPException(status_code=400, detail="invalid payload")
     
-def sync_user_subscription_from_stripe(user: User, subscription:dict, db: Session):
+async def sync_user_subscription_from_stripe(user: User, subscription:dict, db: Session):
 
-    status = subscription.get("status", "inactive")
+        status = subscription.get("status", "inactive")
 
-    user.stripe_subscription_id = subscription.get("id", user.stripe_customer_id)
-    user.stripe_customer_id = subscription.get("customer", user.stripe_customer_id)
+        user.stripe_subscription_id = subscription.get("id", user.stripe_customer_id)
+        user.stripe_customer_id = subscription.get("customer", user.stripe_customer_id)
 
-    if status in {"active", "trialing"}:
-        user.plan = "pro"
-        user.subscription_status = "active"
+        if status in {"active", "trialing"}:
+            user.plan = "pro"
+            user.subscription_status = "active"
 
-    elif status == "past_due":
-        user.plan = "pro"
-        user.subscription_status = "past_due"
-    elif status == "canceled":
-        user.plan = "free"
-        user.subscription_status = "canceled"
-    else:
-        user.subscription_status = status
-        if not subscription.get("cancel_at_period_end", False):
+        elif status == "past_due":
+            user.plan = "pro"
+            user.subscription_status = "past_due"
+        elif status == "canceled":
             user.plan = "free"
+            user.subscription_status = "canceled"
+        else:
+            user.subscription_status = status
+            if not subscription.get("cancel_at_period_end", False):
+                user.plan = "free"
 
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        await delete_cache(f"billing:{user.id}")
+        return user
 
 def handle_stripe_event(event: dict, db: Session):
 
@@ -124,7 +132,7 @@ def handle_stripe_event(event: dict, db: Session):
         db.refresh(user)
         return {"received": True}
     
-    if event_type in {"cutstomer.subscription.created", "customer.subscription.updated"}:
+    if event_type in {"customer.subscription.created", "customer.subscription.updated"}:
         subscription_id = obj.get("id")
         customer_id = obj.get("customer")
 
@@ -139,7 +147,7 @@ def handle_stripe_event(event: dict, db: Session):
     
     if event_type == "customer.subscription.deleted":
         subscription_id = obj.get("id")
-        user = (db.query(User).filter(User.stripe_subscription_id ==subscription_id).fisrt())
+        user = (db.query(User).filter(User.stripe_subscription_id ==subscription_id).first())
 
         if user:
             user.stripe_subscription_id = None
@@ -154,7 +162,7 @@ def handle_stripe_event(event: dict, db: Session):
     if event_type == "invoice.payment_failed":
         subscription_id = obj.get("subscription")
         if subscription_id:
-            user = (db.query(User).filter(User.stripe_customer_id == subscription_id).first())
+            user = (db.query(User).filter(User.stripe_subscrition_id == subscription_id).first())
             if user:
                 user.subscription_status = "past_due"
                 db.add(user)
