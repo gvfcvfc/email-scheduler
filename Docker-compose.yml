@@ -64,7 +64,14 @@ services:
             - db
             - redis
         env_file:
-        - .env
+            - .env
+    streamlit:
+        build: .
+        container_name: email_scheduler_streamlit
+        restart: always
+        command: streamlit run streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+        ports:
+            - "8501:8501"
 volumes:
     postgres_data:
 

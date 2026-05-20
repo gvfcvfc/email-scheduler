@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str
     STRIPE_PRICE_ID: str
     APP_URL: str = "http://127.0.0.1:8000"
+
+    FRONTEND_URL: str = "http://127.0.0.1:8501"
     
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

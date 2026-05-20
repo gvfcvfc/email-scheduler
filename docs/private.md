@@ -45,3 +45,5 @@ git commit --amend --no-edit
 git push --force-with-lease
 git rebase -i HEAD~N
 
+git add .
+git commit -m "Add password reset flow with Streamlit frontend"

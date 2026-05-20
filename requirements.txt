@@ -18,5 +18,7 @@ stripe
 pydantic-settings
 itsdangerous
 httpx
+streamlit
+
 
 

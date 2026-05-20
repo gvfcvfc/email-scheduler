@@ -4,6 +4,7 @@ from app.routes.email_routes import router
 from app.routes.token_routes import router as token_router
 from app.routes.ws_routes import router as ws_router
 from app.routes.stripe_routes import router as st_router
+from app.routes.auth_routes import router as auth_router
 from app.config import settings
 from starlette.middleware.sessions import SessionMiddleware
 from app.utils.rate_limit import check_rate_limit
@@ -23,7 +24,7 @@ def create_app():
         except HTTPException:
             return JSONResponse(
                 status_code=429,
-                content={"detal": "too many requests. Please try again later."}
+                content={"detail": "too many requests. Please try again later."}
             )
 
         return await call_next(request)
@@ -45,5 +46,6 @@ def create_app():
     app.include_router(token_router)
     app.include_router(ws_router)
     app.include_router(st_router)
+    app.include_router(auth_router)
     return app
 app = create_app()

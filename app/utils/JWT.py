@@ -9,7 +9,7 @@ import secrets
 from app.models import RefreshToken, User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+ 
 def hash_password(password: str) -> str:
     if len(password) > 72:
         password = password[:72]
@@ -80,7 +80,6 @@ def get_user_from_access_token(token: str, db: Session):
             return None
         
         user = db.query(User).filter(User.id == int(user_id)).first()
-        print("user", user)
 
         return user
     except JWTError:
