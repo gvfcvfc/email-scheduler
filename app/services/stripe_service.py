@@ -1,6 +1,6 @@
 import stripe
 from app.services.cache_service import get_cache, set_cache, delete_cache
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import User

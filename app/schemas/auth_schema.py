@@ -13,3 +13,6 @@ class ResendVerificationEmailRequest(BaseModel):
 class GenericMessageResponse(BaseModel):
     message: str
 
+class VerifyEmailRequest(BaseModel):
+    token: str
+
