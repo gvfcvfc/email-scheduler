@@ -16,7 +16,7 @@ The project demonstrates a modern backend architecture used in production system
 
 * **OAuth Integration**
 
-  * users can connect their Google account using OAuth
+  * users can connect their GitHub account using OAuth
   * emails are sent from the user’s own account
 
 * **Email Scheduling**
@@ -46,7 +46,7 @@ The project demonstrates a modern backend architecture used in production system
 **Task Processing*** Celery
                     * Redis
 **Authentication**  * JWT
-                    *OAuth (Google)
+                    *OAuth (GitHub)
 **Database**    * PostgreSQL
                 * SQLAlchemy
 **Infrastructure**  * Docker
@@ -73,7 +73,7 @@ This starts:
 # Example Capabilities
 
 * register and authenticate users
-* connect a Google account through OAuth
+* connect a GitHub account through OAuth
 * schedule emails to be sent at a specific time
 * process email delivery through background workers
 * manage scheduled emails through API endpoints

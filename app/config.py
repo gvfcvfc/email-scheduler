@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     APP_URL: str = "http://127.0.0.1:8000"
 
     FRONTEND_URL: str = "http://127.0.0.1:8501"
+
+    MINIO_ENDPOINT: str
+    MINIO_PUBLIC_ENDPOINT: str
+    MINIO_ROOT_USER: str
+    MINIO_ROOT_PASSWORD: str
+    MINIO_BUCKET: str
+    MINO_SECURE: bool = False
     
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
