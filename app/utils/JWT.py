@@ -1,7 +1,7 @@
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request, WebSocket
 from app.config import settings
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -64,7 +64,9 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-def get_user_from_access_token(token: str, db: Session):
+def get_current_user_ws(websocket: WebSocket, db: Session = Depends(get_db)):
+
+    token = websocket.cookies.get("access_token")
     if not token:
         return None
     

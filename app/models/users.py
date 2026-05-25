@@ -16,4 +16,3 @@ class User(Base):
     subscription_status = Column(String, default="inactive")
 
     email_verified = Column(Boolean, default=False)
-

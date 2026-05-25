@@ -1,3 +1,7 @@
+premium_dashboard
+export_csv
+priority_support
+websocket_notifications
 
 GET /track/open/{token}.gif
 GET /track/click/{token}
