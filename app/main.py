@@ -6,6 +6,8 @@ from app.routes.ws_routes import router as ws_router
 from app.routes.stripe_routes import router as st_router
 from app.routes.auth_routes import router as auth_router
 from app.routes.file_routes import router as file_router
+from app.routes.attachment_routes import router as attachment_router
+
 from app.config import settings
 from starlette.middleware.sessions import SessionMiddleware
 from app.utils.rate_limit import check_rate_limit
@@ -49,5 +51,6 @@ def create_app():
     app.include_router(st_router)
     app.include_router(auth_router)
     app.include_router(file_router)
+    app.include_router(attachment_router)
     return app
 app = create_app()

@@ -42,13 +42,3 @@ def billing_cancel():
 @router.get("/settings/billing")
 def setting_billing():
     return{"plan_management": True}
-
-@router.get("/debug/token-user")
-def debug_token_user(user: User = Depends(get_current_user)):
-    return {
-        "id": user.id,
-        "plan": user.plan,
-        "subscription_status": user.subscription_status,
-        "stripe_customer_id": user.stripe_customer_id,
-        "stripe_subscription_id": user.stripe_subscription_id,
-    }
