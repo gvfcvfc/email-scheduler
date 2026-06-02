@@ -49,6 +49,11 @@ def generate_presigned_download_url(key: str, expires_in: int = 300) -> str:
         ExpiresIn=expires_in
     )
 
+def download_object_bytes(key: str) -> bytes:
+    s3 = get_s3_client()
+    response = s3.get_object(Bucket=settings.MINIO_BUCKET, Key=key)
+    return response["Body"].read()
+
 def delete_object(key: str) -> None:
     s3 = get_s3_client()
     s3.delete_object(Bucket=settings.MINIO_BUCKET, Key=key)

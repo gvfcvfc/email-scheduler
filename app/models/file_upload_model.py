@@ -12,3 +12,4 @@ class FileUpload(Base):
     mime_type = Column(String, nullable=False)
     size_bytes = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+ 
