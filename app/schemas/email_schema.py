@@ -14,6 +14,15 @@ class EmailUpdateRequest(BaseModel):
     body: Optional[str] = None
     send_at: Optional[datetime] = None
 
+class EmailFromDraftRequest(BaseModel):
+    send_at: Optional[datetime] = None
+
+class EmailFromTemplateRequest(BaseModel):
+    to: EmailStr
+    send_at: Optional[datetime] = None
+    subject: Optional[str] = None
+    body: Optional[str] = None
+
 class EmailResponse(BaseModel):
     id: int
     to: EmailStr

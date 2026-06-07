@@ -1,6 +1,6 @@
 from app.database import Base
 from logging.config import fileConfig
-from app.models import User
+from app.models import User, EmailRecord, Attachment, FileUpload, DraftRecord, TemplateRecord
 
 
 from sqlalchemy import engine_from_config
