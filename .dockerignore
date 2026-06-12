@@ -1,7 +1,8 @@
+.git
 .env
-docs/private.md
 __pycache__/
-*.pyc/
+*.pyc
+docs/private.md
 postgres_data/
 app/ml/artifacts/
 app/ml/mlruns/

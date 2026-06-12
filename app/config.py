@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -25,6 +27,9 @@ class Settings(BaseSettings):
     APP_URL: str = "http://127.0.0.1:8000"
 
     FRONTEND_URL: str = "http://127.0.0.1:8501"
+
+    MLFLOW_TRACKING_URI: Optional[str] = None
+    MLFLOW_EXPERIMENT_NAME: str = "email-scheduler-ml"
 
     MINIO_ENDPOINT: str
     MINIO_PUBLIC_ENDPOINT: str
