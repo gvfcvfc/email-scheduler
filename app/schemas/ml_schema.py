@@ -22,3 +22,17 @@ class EmailPriorityPredictionResponse(BaseModel):
     probabilities: dict[str, float]
     model_version: str
     dataset_size: int
+
+
+class EmailSpamPredictionResponse(BaseModel):
+    spam: str
+    confidence: float
+    probabilities: dict[str, float]
+    model_version: str
+    dataset_size: int
+
+
+class EmailAnalysisResponse(BaseModel):
+    email_type: EmailTypePredictionResponse
+    priority: EmailPriorityPredictionResponse
+    spam: EmailSpamPredictionResponse

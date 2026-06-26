@@ -16,8 +16,6 @@ Authlib==1.6.9
 websockets
 stripe
 pydantic-settings
-itsdangerous
-httpx
 streamlit
 boto3
 joblib

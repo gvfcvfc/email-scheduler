@@ -17,7 +17,7 @@ from app.ml.model_config import (
     model_version,
     version_slug,
 )
-from app.ml.types import EmailMLBundle, EmailMLPrediction
+from app.ml.types import EmailMLAnalysis, EmailMLBundle, EmailMLPrediction
 from app.services.email_mlflow_service import log_email_ml_training_run
 
 
@@ -28,13 +28,18 @@ class EmailMLServiceError(RuntimeError):
 class EmailMLService:
     def __init__(
         self,
-        dataset_path: Optional[Path] = None,
+        dataset_dir: Optional[Path] = None,
         model_path: Optional[Path] = None,
     ) -> None:
         base_dir = Path(__file__).resolve().parents[1] / "ml"
+        data_dir = dataset_dir or base_dir / "data"
         self.sklearn_version = sklearn.__version__
         self.model_version = model_version()
-        self.dataset_path = dataset_path or base_dir / "data" / "labeled_emails.csv"
+        self.dataset_paths = {
+            "email_type": data_dir / "email_type.csv",
+            "priority": data_dir / "email_priority.csv",
+            "spam": data_dir / "spam_ham_messages.csv",
+        }
         self.model_path = model_path or (
             base_dir
             / "artifacts"
@@ -46,12 +51,28 @@ class EmailMLService:
         self._bundle: Optional[EmailMLBundle] = None
 
     def classify_email_type(self, subject: str, body: str) -> EmailMLPrediction:
-        return self._predict("email_type_model", subject, body)
+        return self._predict("email_type_model", "email_type", subject, body)
 
     def predict_email_priority(self, subject: str, body: str) -> EmailMLPrediction:
-        return self._predict("priority_model", subject, body)
+        return self._predict("priority_model", "priority", subject, body)
 
-    def _predict(self, model_key: str, subject: str, body: str) -> EmailMLPrediction:
+    def detect_spam(self, subject: str, body: str) -> EmailMLPrediction:
+        return self._predict("spam_model", "spam", subject, body)
+
+    def analyze_email(self, subject: str, body: str) -> EmailMLAnalysis:
+        return EmailMLAnalysis(
+            email_type=self.classify_email_type(subject, body),
+            priority=self.predict_email_priority(subject, body),
+            spam=self.detect_spam(subject, body),
+        )
+
+    def _predict(
+        self,
+        model_key: str,
+        dataset_key: str,
+        subject: str,
+        body: str,
+    ) -> EmailMLPrediction:
         bundle = self._get_bundle()
         model = getattr(bundle, model_key)
         text = self._combine_text(subject, body)
@@ -67,7 +88,7 @@ class EmailMLService:
             confidence=probabilities.get(label, 0.0),
             probabilities=probabilities,
             model_version=bundle.model_version,
-            dataset_size=bundle.dataset_size,
+            dataset_size=bundle.dataset_sizes[dataset_key],
         )
 
     def _get_bundle(self) -> EmailMLBundle:
@@ -90,9 +111,11 @@ class EmailMLService:
     def _artifact_is_stale(self) -> bool:
         if not self.model_path.exists():
             return True
-        if not self.dataset_path.exists():
-            return False
-        return self.model_path.stat().st_mtime < self.dataset_path.stat().st_mtime
+        artifact_mtime = self.model_path.stat().st_mtime
+        return any(
+            dataset_path.exists() and artifact_mtime < dataset_path.stat().st_mtime
+            for dataset_path in self.dataset_paths.values()
+        )
 
     def _load_bundle(self) -> Optional[EmailMLBundle]:
         try:
@@ -114,21 +137,33 @@ class EmailMLService:
         )
 
     def _train_and_save_bundle(self) -> EmailMLBundle:
-        rows = self._training_rows()
+        email_type_rows = self._training_rows("email_type", "email_type")
+        priority_rows = self._training_rows("priority", "priority")
+        spam_rows = self._training_rows("spam", "label")
 
-        if len(rows) < 2:
+        if min(len(email_type_rows), len(priority_rows), len(spam_rows)) < 2:
             raise EmailMLServiceError("Email ML training dataset needs at least two rows")
 
-        texts = [self._combine_text(row["subject"], row["body"]) for row in rows]
-        type_labels = [row["email_type"] for row in rows]
-        priority_labels = [row["priority"] for row in rows]
+        email_type_texts = [
+            self._combine_text(row["subject"], row["body"]) for row in email_type_rows
+        ]
+        priority_texts = [
+            self._combine_text(row["subject"], row["body"]) for row in priority_rows
+        ]
+        spam_texts = [self._combine_text(row["subject"], row["body"]) for row in spam_rows]
+
+        type_labels = [row["email_type"] for row in email_type_rows]
+        priority_labels = [row["priority"] for row in priority_rows]
+        spam_labels = [row["label"] for row in spam_rows]
 
         email_type_model = self._build_text_classifier()
         priority_model = self._build_text_classifier()
+        spam_model = self._build_text_classifier()
 
         try:
-            email_type_model.fit(texts, type_labels)
-            priority_model.fit(texts, priority_labels)
+            email_type_model.fit(email_type_texts, type_labels)
+            priority_model.fit(priority_texts, priority_labels)
+            spam_model.fit(spam_texts, spam_labels)
         except Exception as exc:
             raise EmailMLServiceError("Unable to train email ML models") from exc
 
@@ -136,11 +171,17 @@ class EmailMLService:
             model_version=self.model_version,
             sklearn_version=self.sklearn_version,
             trained_at=datetime.now(timezone.utc).isoformat(),
-            dataset_size=len(rows),
+            dataset_sizes={
+                "email_type": len(email_type_rows),
+                "priority": len(priority_rows),
+                "spam": len(spam_rows),
+            },
             email_type_labels=sorted(set(type_labels)),
             priority_labels=sorted(set(priority_labels)),
+            spam_labels=sorted(set(spam_labels)),
             email_type_model=email_type_model,
             priority_model=priority_model,
+            spam_model=spam_model,
         )
 
         self.model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -151,7 +192,7 @@ class EmailMLService:
 
         log_email_ml_training_run(
             bundle=bundle,
-            dataset_path=self.dataset_path,
+            dataset_paths=self.dataset_paths,
             model_path=self.model_path,
             tracking_uri=self._mlflow_tracking_uri(),
         )
@@ -173,17 +214,18 @@ class EmailMLService:
             verbose=True,
         )
 
-    def _training_rows(self) -> list[dict[str, str]]:
-        if not self.dataset_path.exists():
-            raise EmailMLServiceError(f"Email ML dataset not found at {self.dataset_path}")
+    def _training_rows(self, dataset_key: str, label_field: str) -> list[dict[str, str]]:
+        dataset_path = self.dataset_paths[dataset_key]
+        if not dataset_path.exists():
+            raise EmailMLServiceError(f"Email ML dataset not found at {dataset_path}")
 
-        with self.dataset_path.open(newline="", encoding="utf-8") as dataset_file:
+        with dataset_path.open(newline="", encoding="utf-8") as dataset_file:
             rows = list(csv.DictReader(dataset_file))
 
-        required_fields = {"subject", "body", "email_type", "priority"}
+        required_fields = {"subject", "body", label_field}
         for row in rows:
             if not required_fields.issubset(row) or not all(row[field] for field in required_fields):
-                raise EmailMLServiceError("Email ML dataset has an incomplete row")
+                raise EmailMLServiceError(f"{dataset_path.name} has an incomplete row")
 
         return rows
 
@@ -203,7 +245,7 @@ class EmailMLService:
         if tracking_uri:
             return tracking_uri
 
-        mlruns_path = self.dataset_path.parents[1] / "mlruns"
+        mlruns_path = next(iter(self.dataset_paths.values())).parents[1] / "mlruns"
         return mlruns_path.resolve().as_uri()
 
 
